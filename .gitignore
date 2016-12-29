@@ -1,2 +1,3 @@
 *.tar.gz
 !src/vendor/*.tar.gz
+.dobi

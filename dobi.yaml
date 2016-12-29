@@ -1,0 +1,86 @@
+
+meta:
+  project: docker-unikernel-runner
+  default: runner
+
+mount=target:
+  bind: .
+  path: /target
+
+
+image=mir-runner-builder:
+  image: mir-runner-builder
+  dockerfile: Dockerfile.runner-build
+
+job=mir-runner-build:
+  use: mir-runner-builder
+  mounts: [target]
+  command: tar -czf /target/runner.tar.gz runner
+  sources: [Dockerfile.runner-build, src/]
+  artifact: runner.tar.gz
+
+image=mir-runner:
+  image: mir-runner
+  dockerfile: Dockerfile.runner
+  depends: [mir-runner-build]
+  description: "Build the default runner"
+
+
+
+image=mir-runner-debian-builder:
+  image: mir-runner-debian-builder
+  dockerfile: Dockerfile.runner-debian-build
+
+job=mir-runner-debian-build:
+  use: mir-runner-debian-builder
+  mounts: [target]
+  command: tar -czf /target/runner-debian.tar.gz runner
+  sources: [Dockerfile.runner-debian-build, src/]
+  artifact: runner-debian.tar.gz
+
+image=mir-runner-qemu:
+  image: mir-runner-qemu
+  dockerfile: Dockerfile.runner-qemu
+  depends: [mir-runner-debian-build]
+  description: "Build the qemu runner"
+
+
+alias=runner:
+  description: "Build both runners"
+  tasks: [mir-runner, mir-runner-qemu]
+
+
+image=bash:
+  image: bash
+  tags: ['4.4']
+  pull: once
+
+job=check-tests:
+  use: bash
+  mounts: [target]
+  privileged: true
+  command: bash /target/check-tests.sh
+
+
+alias=test:
+    description: "Run the test suite"
+    tasks: [runner, check-tests]
+      #$(MAKE) -C tests/mirage-unix run
+      #$(MAKE) -C tests/mirage-solo5 run
+
+
+
+alias=clean:
+  # TODO: add clean of tests
+  tasks: ['mir-runner-build:rm', 'mir-runner-debian-build:rm']
+  description: "Remove build artifacts"
+
+alias=clobber:
+  # TODO: add clobber of tests
+  tasks:
+    - 'mir-runner-builder:rm'
+    - 'mir-runner-debian-builder:rm'
+    - 'mir-runner:rm'
+    - 'mir-runner-qemu:rm'
+  description: "Remove docker images"
+
